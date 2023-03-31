@@ -4,7 +4,7 @@ extern "C" {
 #include <stdlib.h>
 }
 
-class FooTest: public ::testing::Test {
+class MMTest: public ::testing::Test {
 protected:
 
   void SetUp() override {
@@ -13,6 +13,6 @@ protected:
   void TearDown() override {}
 };
 
-TEST_F(FooTest, TestWordReference) {
+TEST_F(MMTest, TestWordReference) {
   // do your test
 }

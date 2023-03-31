@@ -2,15 +2,15 @@ cmake_minimum_required(VERSION 3.18.4)
 
 set(CMAKE_BUILD_TYPE Debug)
 
-# test for foo 
-set(FOOTEST foo-test)
-set(SOURCES foo-test.cpp)
-add_executable(${FOOTEST} ${SOURCES})
-target_link_libraries(${FOOTEST} PUBLIC 
+# test for mm 
+set(MMTEST mm-test)
+set(SOURCES mm-test.cpp)
+add_executable(${MMTEST} ${SOURCES})
+target_link_libraries(${MMTEST} PUBLIC 
   gtest_main 
-  foo 
+  mm 
 )
-add_test(NAME ${FOOTEST} COMMAND "${FOOTEST}")
+add_test(NAME ${MMTEST} COMMAND "${MMTEST}")
 
 # test for external link_libraries
 set(EXTERNALTEST external-test)
