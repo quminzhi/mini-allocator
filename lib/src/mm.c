@@ -43,7 +43,37 @@ int mm_init() {
  *
  * @todo Cure my dementia.
  */
-void *mm_malloc(size_t size);
+void *mm_malloc(size_t size) {
+  if (size == 0) return NULL;
+
+  size_t size_aligned;
+  // adjust block size to include overhead (header and footer) and alignment reqs
+  // alignment by DSIZE
+  if (size <= DSIZE) {
+    // header and footer and a payload with DSIZE
+    size_aligned = 2 * DSIZE;
+  } else {
+    // size (payload) + DSIZE (hdr/ftr)
+    // (DSIZE - 1) / DSIZE (round up)
+    size_aligned = DSIZE * ((size + (DSIZE) + (DSIZE - 1)) / DSIZE);
+  }
+
+  char *bp = NULL;
+  // search the free list for a fit
+  if ((bp = find_fit(size_aligned)) != NULL) {
+    place(bp, size_aligned);
+    return bp;
+  }
+
+  // no fit found
+  size_t extendsize = MAX(size_aligned, CHUNKSIZE);
+  if ((bp = extend_heap(extendsize / WSIZE)) == NULL) {
+    return NULL;
+  }
+  place(bp, size_aligned);
+  return bp;
+}
+
 void *mm_realloc(void *ptr, size_t size);
 
 /*!
@@ -113,4 +143,12 @@ static void *coalesce(char *bp) {
   }
 
   return bp;
+}
+
+static void *find_fit(size_t size_aligned) {
+
+}
+
+static void *place(char *bp, size_t size_aligned) {
+
 }

@@ -45,5 +45,7 @@ void *mm_realloc(void *ptr, size_t size);
 
 static void *extend_heap(size_t words);
 static void *coalesce(char *bp);
+static void *find_fit(size_t size_aligned);
+static void *place(char *bp, size_t size_aligned);
 
 #endif  // MM_H
