@@ -11,6 +11,7 @@
 #define CHUNKSIZE (1 << 12)  /* Extended heap by this amount (4K bytes) */
 
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
+#define MIN(x, y) ((x) < (y) ? (x) : (y))
 
 // pack a size and allocated bit into a word
 #define PACK(size, alloc_flag) ((size) | (alloc_flag))
@@ -39,13 +40,13 @@
 #define PREV_BLKP(bp) ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))
 
 int mm_init();
-void *mm_malloc(size_t size);
+void *mm_malloc(size_t payload_size);
 void mm_free(void *ptr);
-void *mm_realloc(void *ptr, size_t size);
+void *mm_realloc(void *ptr, size_t payload_size);
 
-static void *extend_heap(size_t words);
+static void *extend_heap(size_t block_words);
 static void *coalesce(char *bp);
 static void *find_fit(size_t size_aligned);
-static void *place(char *bp, size_t size_aligned);
+static void place(char *bp, size_t size_aligned);
 
 #endif  // MM_H

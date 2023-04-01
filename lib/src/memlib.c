@@ -1,11 +1,13 @@
 #include "memlib.h"
-#include <stdlib.h>
-#include <stdio.h>
 #include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
 
-static char *mem_heap;     /* points to the first byte of heap */
-static char *mem_brk;      /* points to the last byte of heap plus 1 */
-static char *mem_max_addr; /* max legal heap addr plus 1 */
+static char *mem_heap; /* points to the first byte of heap */
+static char *mem_brk;  /* points to the last byte of heap plus 1, or the first
+                          illegal address of heap */
+static char *mem_max_addr; /* max legal heap addr plus 1, or the first illegal
+                              address of heap space */
 
 /**
  * @brief init heap and set brk and max heap addr
@@ -25,6 +27,8 @@ int mem_init() {
 /*!
  * @brief mm_sbrk increases heap by size of 'incr' bytes
  *
+ * assumed that the heap is monotonically increasing.
+ *
  * return old address of brk
  */
 void *mem_sbrk(int incr) {
@@ -43,6 +47,4 @@ void *mem_sbrk(int incr) {
 /*!
  * @brief mem_teardown tears down the allocated storage
  */
-void mem_teardown() {
-  free(mem_heap);
-}
+void mem_teardown() { free(mem_heap); }

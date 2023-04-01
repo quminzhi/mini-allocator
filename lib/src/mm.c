@@ -1,5 +1,6 @@
 #include "mm.h"
 #include "memlib.h"
+#include <string.h>
 
 static char *heap_listp;
 
@@ -31,7 +32,8 @@ int mm_init() {
   // heap_listp points to the payload(0) of prologue block
   heap_listp -= WSIZE;
 
-  // extend the empty heap with a free block of CHUNKSIZE bytes
+  // extend the empty heap with a free block with size of CHUNKSIZE bytes
+  // NOTE: block size != payload size
   if (extend_heap(CHUNKSIZE / WSIZE) == NULL) {
     return -1;
   }
@@ -39,23 +41,25 @@ int mm_init() {
   return 0;
 }
 
-/*! TODO: mm_malloc and mm_realloc
+/*!
+ * @brief: mm_malloc aligns up payload size and find a fit for that block.
  *
- * @todo Cure my dementia.
+ * return the pb for the block
  */
-void *mm_malloc(size_t size) {
-  if (size == 0) return NULL;
+void *mm_malloc(size_t payload_size) {
+  if (payload_size == 0)
+    return NULL;
 
   size_t size_aligned;
-  // adjust block size to include overhead (header and footer) and alignment reqs
-  // alignment by DSIZE
-  if (size <= DSIZE) {
+  // adjust block payload_size to include overhead (header and footer) and
+  // alignment  // reqs alignment by DSIZE
+  if (payload_size <= DSIZE) {
     // header and footer and a payload with DSIZE
     size_aligned = 2 * DSIZE;
   } else {
-    // size (payload) + DSIZE (hdr/ftr)
+    // payload_size (payload) + DSIZE (hdr/ftr)
     // (DSIZE - 1) / DSIZE (round up)
-    size_aligned = DSIZE * ((size + (DSIZE) + (DSIZE - 1)) / DSIZE);
+    size_aligned = DSIZE * ((payload_size + (DSIZE) + (DSIZE - 1)) / DSIZE);
   }
 
   char *bp = NULL;
@@ -71,10 +75,60 @@ void *mm_malloc(size_t size) {
     return NULL;
   }
   place(bp, size_aligned);
-  return bp;
+  return (void *)bp;
 }
 
-void *mm_realloc(void *ptr, size_t size);
+/*!
+ * @brief mm_realloc aligns payload size up. There are two cases:
+ *
+ * - meet split condition
+ *   split memory in-place
+ *
+ *    |<-----------  old size  ---------->|
+ *    +-----+-----+-----+-----+-----+-----+
+ *    | hdr | pay | ftr | hdr | pay | ftr |
+ *    +-----+-----+-----+-----+-----+-----+
+ *         allocated           free
+ *    |<-- new size  -->|  DSIZE at least
+ *
+ * - do not meet split condition
+ *   find a fit, and copy content in original block to new block as much as 
+ *   possible, and finally free original block.
+ *
+ * return new bp if succuess, old bp otherwise
+ */
+void *mm_realloc(void *bp, size_t payload_size) {
+  // adjust payload_size to alignment reqs
+  size_t new_size;
+  if (payload_size <= DSIZE) {
+    new_size = 2 * DSIZE;
+  } else {
+    new_size = DSIZE * ((payload_size + (DSIZE) + (DSIZE - 1)) / DSIZE);
+  }
+
+  char *new_bp = NULL;
+  size_t old_size = GET_SIZE(HDRP(bp));
+  if (old_size >= new_size + DSIZE) {
+    // split in-place
+    size_t free_size = old_size - new_size;
+    PUT(FTRP(bp), PACK(free_size, 0));
+    PUT(HDRP(bp), PACK(new_size, 1));
+    PUT(FTRP(bp), PACK(new_size, 1));
+    PUT(HDRP(NEXT_BLKP(bp)), PACK(free_size, 0));
+
+    coalesce(NEXT_BLKP(bp));
+    new_bp = bp;
+  } else {
+    // allocate a new space
+    if ((new_bp = (char *)mm_malloc(payload_size)) == NULL) {
+      return bp;
+    }
+    // copy min(payload_size of new block, payload of old block)
+    memcpy(new_bp, bp, MIN(payload_size, old_size - DSIZE));
+    mm_free(bp);
+  }
+  return new_bp;
+}
 
 /*!
  * @brief mm_free free current block and coalesce if necessary
@@ -88,12 +142,19 @@ void mm_free(void *bp) {
   coalesce(bp);
 }
 
+/*!
+ * @brief extend_heap extends heap by moving brk by calling mem_sbrk routine
+ *
+ * @words: block size, NOT payload size
+ *
+ * return block pointer which points to the start address of payload
+ */
 static void *extend_heap(size_t words) {
-  // allocate even number of words to maintain alignment
+  // allocate even number of words to maintain DSIZE alignment
   size_t size = words % 2 ? (words + 1) * WSIZE : words * WSIZE;
 
   char *bp = NULL;
-  if ((long)(bp = mem_sbrk(size)) == -1) {
+  if ((long)(bp = mem_sbrk(size)) == -1l) {
     return NULL;
   }
 
@@ -145,10 +206,35 @@ static void *coalesce(char *bp) {
   return bp;
 }
 
+/*!
+ * @brief find_fit find a fit storage for the request
+ * 
+ * we will implement the first-fit algorithm for find_fit function
+ *
+ * return a pointer for available space
+ */
 static void *find_fit(size_t size_aligned) {
-
+  for (void *bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
+    if (!GET_ALLOC(HDRP(bp)) && (size_aligned < GET_SIZE(HDRP(bp)))) {
+      return bp;
+    }
+  }
+  return NULL;
 }
 
-static void *place(char *bp, size_t size_aligned) {
+static void place(char *bp, size_t new_size) {
+  size_t old_size = GET_SIZE(HDRP(bp));
 
+  if ((old_size - new_size) >= (2 * DSIZE)) {
+    // split
+    PUT(HDRP(bp), PACK(new_size, 1));
+    PUT(FTRP(bp), PACK(new_size, 1));
+    bp = NEXT_BLKP(bp);
+    PUT(HDRP(bp), PACK(old_size - new_size, 0));
+    PUT(FTRP(bp), PACK(old_size - new_size, 0));
+  } else {
+    // no need to split
+    PUT(HDRP(bp), PACK(new_size, 1));
+    PUT(FTRP(bp), PACK(new_size, 1));
+  }
 }
